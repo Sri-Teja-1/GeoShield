@@ -57,11 +57,15 @@ class Settings(BaseSettings):
     embedding_dim: int = 1536  # OpenAI text-embedding-3-small
 
     # ── Model identifiers ───────────────────────────────────────────────
-    # Self-reported by /health and tagged onto every stored point (§5.2). The
-    # exact provider model IDs are confirmed when the service wrappers are
-    # implemented in Phase 2; these are the configured defaults.
-    vllm_model: str = "llama-3.2-11b-vision-preview"
-    llm_model: str = "gemini-2.0-flash"
+    # Self-reported by /health and tagged onto every stored point (§5.2).
+    # vllm_model: Groq retired the llama-3.2-*-vision-preview checkpoints; the
+    # current Llama vision model on Groq is Llama 4 Scout (multimodal). CLAUDE.md
+    # §5 allows "latest available Llama Vision on Groq". Confirmed against Groq's
+    # live model list during Phase 2 verification.
+    vllm_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    # gemini-2.0-flash is now off the free tier (quota limit 0 on AI Studio keys);
+    # gemini-2.5-flash has free-tier quota and is allowed by CLAUDE.md §3.3.
+    llm_model: str = "gemini-2.5-flash"
     embedding_model: str = "text-embedding-3-small"
     clip_model: str = "openai/clip-vit-base-patch32"
 
