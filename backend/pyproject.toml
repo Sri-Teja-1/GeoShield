@@ -1,0 +1,44 @@
+[project]
+name = "geoshield-backend"
+version = "0.1.0"
+description = "GeoShield backend — agentic zero-shot land-use classification with LangGraph, RAG, and vision-language models"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    # Web framework
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",       # required for multipart/form-data (image upload) on /analyze
+    "slowapi",                # per-IP rate limiting
+    # Validation / config
+    "pydantic>=2",
+    "pydantic-settings",
+    # Agent
+    "langgraph",
+    "langchain-core",
+    # Vector DB
+    "qdrant-client",
+    # Model providers
+    "groq",                   # Llama 3.2 Vision (vLLM path)
+    "google-generativeai",    # Gemini Flash (classifier + synthesis)
+    "openai",                 # text-embedding-3-small
+    # Local CLIP fallback (CPU)
+    "torch",
+    "transformers",
+    # Imaging + object storage
+    "pillow",
+    "boto3",                  # Cloudflare R2 (S3-compatible)
+]
+
+[tool.uv]
+# This is an application, not a distributable library — don't build/install the project itself.
+package = false
+
+# Pin torch to CPU wheels: CLIP runs locally on CPU by design (small model, acceptable
+# latency on the fallback path), and this avoids pulling the large CUDA build. See CLAUDE.md §3.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

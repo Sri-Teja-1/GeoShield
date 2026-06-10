@@ -1,0 +1,2162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geoshield — Interactive Preview</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<style>
+:root {
+  --gs-slate-975: #080d14;
+  --gs-slate-950: #0d1520;
+  --gs-slate-900: #111c2d;
+  --gs-slate-800: #1a2d44;
+  --gs-slate-700: #243b53;
+  --gs-slate-600: #334e68;
+  --gs-slate-500: #486581;
+  --gs-slate-400: #6b8cae;
+  --color-bg: #080d14;
+  --color-surface: #0d1520;
+  --color-card: #111c2d;
+  --color-card-raised: #1a2d44;
+  --color-fg: #e8edf5;
+  --color-fg-2: #9ca3af;
+  --color-fg-3: #6b7280;
+  --color-primary: #0ea5e9;
+  --color-primary-hover: #38bdf8;
+  --color-primary-active: #0284c7;
+  --color-primary-subtle: rgba(14, 165, 233, 0.12);
+  --color-primary-border: rgba(14, 165, 233, 0.3);
+  --color-secondary: #10b981;
+  --color-secondary-subtle: rgba(16, 185, 129, 0.12);
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-border-mid: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+#root { width: 100vw; min-height: 100vh; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea { font-family: inherit; }
+a { color: inherit; text-decoration: none; }
+
+@keyframes gs-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.gs-skeleton {
+  background: linear-gradient(90deg, var(--gs-slate-900) 25%, var(--gs-slate-800) 50%, var(--gs-slate-900) 75%);
+  background-size: 200% 100%;
+  animation: gs-shimmer 1.5s infinite linear;
+  border-radius: 6px;
+}
+
+@keyframes gs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.gs-pulse { animation: gs-pulse 1.5s ease-in-out infinite; }
+
+@keyframes gs-reticle-pulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+@keyframes gs-radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes gs-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gs-fade-up { animation: gs-fade-up 250ms ease-out backwards; }
+
+@keyframes gs-button-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.leaflet-container { background: var(--gs-slate-975) !important; }
+.leaflet-control-attribution { background: rgba(13,21,32,0.85) !important; color: var(--color-fg-3) !important; font-family: var(--font-mono) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: var(--color-fg-2) !important; }
+
+.gs-reticle-marker {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+.gs-reticle-marker .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  background: transparent;
+}
+.gs-reticle-marker .dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+.gs-reticle-marker .pulse {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  animation: gs-reticle-pulse 2s ease-out infinite;
+}
+
+.gs-pin-marker {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+}
+.gs-pin-marker .pin-ring {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+  background: rgba(14,165,233,0.25);
+  box-shadow: 0 0 0 4px rgba(14,165,233,0.15);
+  animation: gs-pulse 1.6s ease-in-out infinite;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js" crossorigin="anonymous"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+const DS = {
+  bg: 'var(--color-bg)', surface: 'var(--color-surface)', card: 'var(--color-card)',
+  cardRaised: 'var(--color-card-raised)',
+  fg: 'var(--color-fg)', fg2: 'var(--color-fg-2)', fg3: 'var(--color-fg-3)',
+  primary: 'var(--color-primary)', primaryHover: 'var(--color-primary-hover)',
+  primarySubtle: 'var(--color-primary-subtle)', primaryBorder: 'var(--color-primary-border)',
+  secondary: 'var(--color-secondary)', secondarySubtle: 'var(--color-secondary-subtle)',
+  success: 'var(--color-success)', warning: 'var(--color-warning)', error: 'var(--color-error)',
+  border: 'var(--color-border)', borderMid: 'var(--color-border-mid)', borderStrong: 'var(--color-border-strong)',
+  display: 'var(--font-display)', body: 'var(--font-body)', mono: 'var(--font-mono)',
+};
+
+// ================== ICONS (inline SVG) ==================
+const Icon = ({ name, size = 14, color = 'currentColor', strokeWidth = 1.6 }) => {
+  const s = { width: size, height: size, fill: 'none', stroke: color, strokeWidth, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  const map = {
+    plus: <svg viewBox="0 0 24 24" {...s}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    minus: <svg viewBox="0 0 24 24" {...s}><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    x: <svg viewBox="0 0 24 24" {...s}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+    check: <svg viewBox="0 0 24 24" {...s}><polyline points="20 6 9 17 4 12"/></svg>,
+    chevronDown: <svg viewBox="0 0 24 24" {...s}><polyline points="6 9 12 15 18 9"/></svg>,
+    chevronRight: <svg viewBox="0 0 24 24" {...s}><polyline points="9 18 15 12 9 6"/></svg>,
+    chevronLeft: <svg viewBox="0 0 24 24" {...s}><polyline points="15 18 9 12 15 6"/></svg>,
+    arrowRight: <svg viewBox="0 0 24 24" {...s}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+    upload: <svg viewBox="0 0 24 24" {...s}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+    mapPin: <svg viewBox="0 0 24 24" {...s}><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+    crosshair: <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/></svg>,
+    sliders: <svg viewBox="0 0 24 24" {...s}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>,
+    cpu: <svg viewBox="0 0 24 24" {...s}><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>,
+    eye: <svg viewBox="0 0 24 24" {...s}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+    layers: <svg viewBox="0 0 24 24" {...s}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+    database: <svg viewBox="0 0 24 24" {...s}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+    flame: <svg viewBox="0 0 24 24" {...s}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>,
+    info: <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
+    bookmark: <svg viewBox="0 0 24 24" {...s}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>,
+    download: <svg viewBox="0 0 24 24" {...s}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+    play: <svg viewBox="0 0 24 24" {...s}><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+    git: <svg viewBox="0 0 24 24" {...s}><circle cx="6" cy="3" r="2"/><circle cx="6" cy="21" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 5v14"/><path d="M6 12h10"/></svg>,
+    refresh: <svg viewBox="0 0 24 24" {...s}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+    shield: <svg viewBox="0 0 24 24" {...s}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+    target: <svg viewBox="0 0 24 24" {...s}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+    branch: <svg viewBox="0 0 24 24" {...s}><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>,
+  };
+  return map[name] || null;
+};
+
+// ================== SHARED COMPONENTS ==================
+
+const Button = ({ children, variant = 'primary', size = 'md', icon, iconRight, full = false, onClick, disabled = false, loading = false, style = {} }) => {
+  const sizes = {
+    sm: { padding: '6px 12px', fontSize: 12, gap: 6 },
+    md: { padding: '10px 16px', fontSize: 13, gap: 8 },
+    lg: { padding: '12px 20px', fontSize: 14, gap: 8 },
+  };
+  const variants = {
+    primary: {
+      background: loading ? 'rgba(14,165,233,0.7)' : 'linear-gradient(135deg, #0ea5e9, #0369a1)',
+      color: '#fff',
+      border: 'none',
+    },
+    secondary: {
+      background: 'transparent',
+      color: DS.primary,
+      border: `1px solid ${DS.primaryBorder}`,
+    },
+    ghost: {
+      background: 'transparent',
+      color: DS.fg2,
+      border: `1px solid ${DS.border}`,
+    },
+    tertiary: {
+      background: 'transparent',
+      color: DS.primary,
+      border: 'none',
+      padding: 0,
+    },
+  };
+  const s = sizes[size];
+  const v = variants[variant];
+  return (
+    <button onClick={onClick} disabled={disabled || loading} style={{
+      ...s, ...v,
+      width: full ? '100%' : 'auto',
+      borderRadius: 6,
+      fontWeight: 500,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: s.gap,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled && !loading ? 0.5 : 1,
+      position: 'relative',
+      overflow: 'hidden',
+      transition: 'all 200ms cubic-bezier(0.4,0,0.2,1)',
+      fontFamily: DS.body,
+      ...style,
+    }}>
+      {loading && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)',
+          animation: 'gs-button-sweep 1.5s linear infinite',
+        }}/>
+      )}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: s.gap, position: 'relative', zIndex: 1 }}>
+        {icon && <Icon name={icon} size={s.fontSize}/>}
+        {children}
+        {iconRight && <Icon name={iconRight} size={s.fontSize}/>}
+      </span>
+    </button>
+  );
+};
+
+const Eyebrow = ({ children, color = DS.primary }) => (
+  <div style={{
+    fontFamily: DS.mono, fontSize: 10, color,
+    letterSpacing: '0.14em', textTransform: 'uppercase',
+    fontWeight: 500, marginBottom: 4,
+  }}>{children}</div>
+);
+
+const ToggleGroup = ({ value, onChange, options }) => (
+  <div style={{
+    display: 'inline-flex',
+    background: DS.card,
+    border: `1px solid ${DS.border}`,
+    borderRadius: 6,
+    padding: 3,
+    gap: 2,
+  }}>
+    {options.map(o => {
+      const active = o.value === value;
+      return (
+        <button key={o.value} onClick={() => onChange(o.value)} style={{
+          padding: '6px 12px',
+          fontSize: 12,
+          fontFamily: DS.body,
+          fontWeight: 500,
+          background: active ? DS.primary : 'transparent',
+          color: active ? '#fff' : DS.fg2,
+          borderRadius: 4,
+          transition: 'all 200ms ease',
+        }}>{o.label}</button>
+      );
+    })}
+  </div>
+);
+
+const ConfidenceDots = ({ score, max = 5, size = 8 }) => {
+  const colorFor = (s) => s >= 4 ? DS.success : s >= 3 ? DS.warning : DS.error;
+  const c = colorFor(score);
+  return (
+    <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+      {[...Array(max)].map((_, i) => (
+        <div key={i} style={{
+          width: size, height: size, borderRadius: '50%',
+          background: i < score ? c : 'rgba(255,255,255,0.1)',
+          border: i < score ? 'none' : `1px solid rgba(255,255,255,0.15)`,
+          boxShadow: i < score ? `0 0 6px ${c}66` : 'none',
+        }}/>
+      ))}
+    </div>
+  );
+};
+
+const ConfidenceLabel = ({ score }) => {
+  const label = score >= 4 ? 'High' : score >= 3 ? 'Medium' : 'Low';
+  const color = score >= 4 ? DS.success : score >= 3 ? DS.warning : DS.error;
+  return (
+    <span style={{ fontFamily: DS.body, fontSize: 12, fontWeight: 500, color, letterSpacing: '0.01em' }}>
+      Confidence: {label} ({score}/5)
+    </span>
+  );
+};
+
+// ================== TOP NAV ==================
+
+const TopNav = ({ active, onNavigate }) => {
+  const items = ['Overview', 'Analysis', 'Archive', 'Architecture'];
+  return (
+    <div style={{
+      height: 64,
+      background: 'rgba(8,13,20,0.85)',
+      backdropFilter: 'blur(12px)',
+      borderBottom: `1px solid ${DS.border}`,
+      display: 'flex',
+      alignItems: 'center',
+      padding: '0 32px',
+      flexShrink: 0,
+      position: 'sticky',
+      top: 0,
+      zIndex: 100,
+    }}>
+      {/* Logo */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 40 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 7,
+          background: 'linear-gradient(135deg, #0ea5e9, #0369a1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 12px rgba(14,165,233,0.4)',
+        }}>
+          <Icon name="shield" size={15} color="#fff"/>
+        </div>
+        <div style={{
+          fontFamily: DS.display, fontSize: 14, fontWeight: 700,
+          letterSpacing: '0.06em', color: DS.fg, textTransform: 'uppercase',
+        }}>
+          GEO<span style={{ color: DS.primary }}>SHIELD</span>
+        </div>
+      </div>
+
+      {/* Nav items */}
+      <nav style={{ display: 'flex', gap: 4 }}>
+        {items.map(item => {
+          const isActive = active === item.toLowerCase();
+          return (
+            <button key={item} onClick={() => onNavigate(item.toLowerCase())} style={{
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 500,
+              color: isActive ? DS.fg : DS.fg2,
+              position: 'relative',
+              transition: 'color 150ms ease',
+            }}
+            onMouseEnter={e => !isActive && (e.currentTarget.style.color = DS.fg)}
+            onMouseLeave={e => !isActive && (e.currentTarget.style.color = DS.fg2)}>
+              {item}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: -22,
+                  left: 16, right: 16,
+                  height: 2,
+                  background: DS.primary,
+                  borderRadius: 1,
+                }}/>
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Right side: status */}
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontFamily: DS.mono, fontSize: 11, color: DS.fg2,
+          letterSpacing: '0.08em',
+        }}>
+          <span className="gs-pulse" style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: DS.success,
+            boxShadow: `0 0 6px ${DS.success}`,
+          }}/>
+          QDRANT · OK
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ================== OVERVIEW PAGE ==================
+
+const Radar = () => {
+  return (
+    <div style={{
+      width: 480, height: 480,
+      position: 'relative',
+      flexShrink: 0,
+    }}>
+      <svg width="480" height="480" viewBox="0 0 480 480" style={{ position: 'absolute', inset: 0 }}>
+        {/* Concentric circles */}
+        {[60, 120, 180, 220].map(r => (
+          <circle key={r} cx="240" cy="240" r={r} fill="none" stroke="rgba(14,165,233,0.12)" strokeWidth="1"/>
+        ))}
+        {/* Crosshairs */}
+        <line x1="20" y1="240" x2="460" y2="240" stroke="rgba(14,165,233,0.15)" strokeWidth="1"/>
+        <line x1="240" y1="20" x2="240" y2="460" stroke="rgba(14,165,233,0.15)" strokeWidth="1"/>
+        <line x1="86" y1="86" x2="394" y2="394" stroke="rgba(14,165,233,0.08)" strokeWidth="1" strokeDasharray="2 4"/>
+        <line x1="394" y1="86" x2="86" y2="394" stroke="rgba(14,165,233,0.08)" strokeWidth="1" strokeDasharray="2 4"/>
+
+        {/* Land masses */}
+        <path d="M 180 200 Q 200 180, 230 190 Q 260 195, 270 220 Q 265 245, 240 250 Q 210 245, 195 230 Z" fill="rgba(16,185,129,0.18)" stroke="rgba(16,185,129,0.4)" strokeWidth="1"/>
+        <path d="M 285 210 Q 305 215, 310 235 Q 305 250, 290 245 Z" fill="rgba(16,185,129,0.18)" stroke="rgba(16,185,129,0.4)" strokeWidth="1"/>
+        <path d="M 195 270 Q 215 275, 220 290 Q 210 300, 195 295 Z" fill="rgba(16,185,129,0.18)" stroke="rgba(16,185,129,0.4)" strokeWidth="1"/>
+
+        {/* Center reticle */}
+        <circle cx="240" cy="240" r="6" fill={DS.primary}/>
+        <circle cx="240" cy="240" r="14" fill="none" stroke={DS.primary} strokeWidth="1.5"/>
+
+        {/* Markers */}
+        <circle cx="295" cy="225" r="4" fill={DS.primary}/>
+        <circle cx="200" cy="285" r="4" fill="#fcd34d"/>
+        <circle cx="220" cy="195" r="4" fill={DS.success}/>
+        <circle cx="280" cy="280" r="4" fill="#fca5a5"/>
+
+        {/* Sweep beam */}
+        <g style={{ transformOrigin: '240px 240px', animation: 'gs-radar-sweep 6s linear infinite' }}>
+          <defs>
+            <linearGradient id="sweep" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={DS.primary} stopOpacity="0.5"/>
+              <stop offset="100%" stopColor={DS.primary} stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 240 240 L 240 20 A 220 220 0 0 1 350 60 Z" fill="url(#sweep)"/>
+        </g>
+
+        {/* Coordinate labels */}
+        <text x="450" y="244" textAnchor="end" fontFamily={DS.mono} fontSize="10" fill={DS.fg3} letterSpacing="0.08em">E 122°19'56"</text>
+        <text x="240" y="14" textAnchor="middle" fontFamily={DS.mono} fontSize="10" fill={DS.fg3} letterSpacing="0.08em">N 47°36'22"</text>
+        <text x="20" y="476" fontFamily={DS.mono} fontSize="10" fill={DS.fg3} letterSpacing="0.08em">ALT 8.4km</text>
+        <text x="460" y="476" textAnchor="end" fontFamily={DS.mono} fontSize="10" fill={DS.success} letterSpacing="0.08em">SAT-LOCK</text>
+      </svg>
+    </div>
+  );
+};
+
+const OverviewPage = ({ onNavigate }) => {
+  return (
+    <div style={{ minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 64px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 80, maxWidth: 1400, width: '100%' }}>
+        {/* Left: Copy */}
+        <div style={{ flex: 1, maxWidth: 620 }}>
+          <h1 style={{
+            fontFamily: DS.display, fontSize: 60, fontWeight: 700,
+            lineHeight: 1.05, letterSpacing: '-0.03em',
+            marginBottom: 28, color: DS.fg,
+          }}>
+            Zero-shot land-use<br/>
+            monitoring,{' '}
+            <span style={{ color: DS.primary, fontStyle: 'italic', fontWeight: 600 }}>grounded</span><br/>
+            in retrieved prior<br/>analyses.
+          </h1>
+
+          <p style={{
+            fontFamily: DS.body, fontSize: 17, color: DS.fg2,
+            lineHeight: 1.6, marginBottom: 40, maxWidth: 540,
+            fontWeight: 300,
+          }}>
+            An agentic extension of Microsoft's GeoVision Labeler. A LangGraph
+            agent describes satellite imagery with a vLLM, retrieves prior analyses
+            from a hybrid geospatial RAG store, and classifies against your own
+            taxonomy with confidence-gated fallbacks.
+          </p>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Button variant="primary" size="lg" icon="play" onClick={() => onNavigate('analysis')}>
+              Run an Analysis
+            </Button>
+            <Button variant="ghost" size="lg" icon="git" onClick={() => onNavigate('architecture')}>
+              Inspect the Agent
+            </Button>
+          </div>
+        </div>
+
+        {/* Right: Radar */}
+        <Radar/>
+      </div>
+    </div>
+  );
+};
+
+// ================== COORDINATE PICKER MODAL ==================
+
+const CoordinatePicker = ({ isOpen, onClose, onConfirm, initialLat, initialLon }) => {
+  const mapRef = useRef(null);
+  const mapInstance = useRef(null);
+  const markerRef = useRef(null);
+  const [lat, setLat] = useState(initialLat ?? 47.6062);
+  const [lon, setLon] = useState(initialLon ?? -122.3321);
+  const [latStr, setLatStr] = useState(String(initialLat ?? 47.6062));
+  const [lonStr, setLonStr] = useState(String(initialLon ?? -122.3321));
+  const [latError, setLatError] = useState('');
+  const [lonError, setLonError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen || !mapRef.current) return;
+    if (mapInstance.current) return;
+
+    const map = L.map(mapRef.current, {
+      center: [lat, lon],
+      zoom: 11,
+      zoomControl: false,
+      attributionControl: true,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    const markerEl = document.createElement('div');
+    markerEl.className = 'gs-pin-marker';
+    markerEl.innerHTML = '<div class="pin-ring"></div>';
+    const icon = L.divIcon({ className: '', html: markerEl.outerHTML, iconSize: [22,22], iconAnchor: [11,11] });
+    markerRef.current = L.marker([lat, lon], { icon }).addTo(map);
+
+    map.on('click', (e) => {
+      const newLat = e.latlng.lat;
+      const newLon = e.latlng.lng;
+      setLat(newLat);
+      setLon(newLon);
+      setLatStr(newLat.toFixed(6));
+      setLonStr(newLon.toFixed(6));
+      setLatError(''); setLonError('');
+      if (markerRef.current) {
+        markerRef.current.setLatLng([newLat, newLon]);
+      }
+    });
+
+    mapInstance.current = map;
+
+    setTimeout(() => map.invalidateSize(), 50);
+
+    return () => {
+      // Don't destroy on close so the map persists between opens
+    };
+  }, [isOpen]);
+
+  // Cleanup when fully unmounted
+  useEffect(() => {
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, []);
+
+  // When user types coords, update map
+  const validateAndSyncFromInputs = (newLatStr, newLonStr) => {
+    const newLat = parseFloat(newLatStr);
+    const newLon = parseFloat(newLonStr);
+    let lErr = '', oErr = '';
+    if (isNaN(newLat) || newLat < -90 || newLat > 90) lErr = 'Latitude must be between -90 and 90';
+    if (isNaN(newLon) || newLon < -180 || newLon > 180) oErr = 'Longitude must be between -180 and 180';
+    setLatError(lErr); setLonError(oErr);
+    if (!lErr && !oErr && mapInstance.current && markerRef.current) {
+      setLat(newLat); setLon(newLon);
+      markerRef.current.setLatLng([newLat, newLon]);
+      mapInstance.current.setView([newLat, newLon], mapInstance.current.getZoom());
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const isValid = !latError && !lonError && latStr && lonStr;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(8,13,20,0.85)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 32,
+    }} onClick={onClose}>
+      <div style={{
+        width: '60vw', maxWidth: 1100,
+        height: '70vh', maxHeight: 720,
+        background: DS.surface,
+        border: `1px solid ${DS.borderMid}`,
+        borderRadius: 10,
+        overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 24px',
+          borderBottom: `1px solid ${DS.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <Eyebrow>§ COORDINATE PICKER</Eyebrow>
+            <div style={{ fontFamily: DS.display, fontSize: 18, fontWeight: 600, color: DS.fg, marginTop: 2 }}>
+              Select target location
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: 6,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: DS.fg2,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = DS.fg; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = DS.fg2; }}>
+            <Icon name="x" size={16}/>
+          </button>
+        </div>
+
+        {/* Map */}
+        <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+          <div ref={mapRef} style={{ position: 'absolute', inset: 0 }}/>
+
+          {/* Manual input panel — bottom right */}
+          <div style={{
+            position: 'absolute', bottom: 16, right: 16,
+            background: 'rgba(13,21,32,0.92)',
+            border: `1px solid ${DS.borderMid}`,
+            borderRadius: 8,
+            backdropFilter: 'blur(10px)',
+            padding: 14,
+            width: 240,
+            zIndex: 500,
+          }}>
+            <Eyebrow>MANUAL ENTRY</Eyebrow>
+            <div style={{ marginTop: 10 }}>
+              <label style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.08em', display: 'block', marginBottom: 4 }}>LATITUDE</label>
+              <input
+                type="text"
+                value={latStr}
+                onChange={e => { setLatStr(e.target.value); validateAndSyncFromInputs(e.target.value, lonStr); }}
+                style={{
+                  width: '100%', padding: '7px 10px',
+                  background: DS.bg,
+                  border: `1px solid ${latError ? DS.error : DS.border}`,
+                  borderRadius: 4,
+                  color: DS.fg,
+                  fontFamily: DS.mono, fontSize: 12,
+                  outline: 'none',
+                }}
+              />
+              {latError && <div style={{ fontSize: 10, color: DS.error, marginTop: 3 }}>{latError}</div>}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <label style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.08em', display: 'block', marginBottom: 4 }}>LONGITUDE</label>
+              <input
+                type="text"
+                value={lonStr}
+                onChange={e => { setLonStr(e.target.value); validateAndSyncFromInputs(latStr, e.target.value); }}
+                style={{
+                  width: '100%', padding: '7px 10px',
+                  background: DS.bg,
+                  border: `1px solid ${lonError ? DS.error : DS.border}`,
+                  borderRadius: 4,
+                  color: DS.fg,
+                  fontFamily: DS.mono, fontSize: 12,
+                  outline: 'none',
+                }}
+              />
+              {lonError && <div style={{ fontSize: 10, color: DS.error, marginTop: 3 }}>{lonError}</div>}
+            </div>
+          </div>
+
+          {/* Hint pill — top right */}
+          <div style={{
+            position: 'absolute', top: 16, right: 16,
+            background: 'rgba(13,21,32,0.85)',
+            border: `1px solid ${DS.border}`,
+            borderRadius: 6,
+            padding: '6px 10px',
+            backdropFilter: 'blur(6px)',
+            fontFamily: DS.mono, fontSize: 10, color: DS.fg2,
+            letterSpacing: '0.06em',
+            zIndex: 500,
+          }}>
+            Click map or type to set coordinates
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '14px 24px',
+          borderTop: `1px solid ${DS.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg3 }}>
+            Selected: <span style={{ color: DS.fg }}>{lat.toFixed(4)}°, {lon.toFixed(4)}°</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="ghost" size="md" onClick={onClose}>Cancel</Button>
+            <Button variant="primary" size="md" disabled={!isValid} onClick={() => { onConfirm({ lat, lon }); onClose(); }}>
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ================== ANALYSIS PAGE ==================
+
+const STAGES = [
+  { id: 'validate', label: 'Validate', section: null },
+  { id: 'preprocess', label: 'Preprocess', section: null },
+  { id: 'describe', label: 'Describe', section: 'visual' },
+  { id: 'synthesize', label: 'Synthesize', section: 'visual' },
+  { id: 'retrieve', label: 'Retrieve', section: 'priors' },
+  { id: 'classify', label: 'Classify', section: 'headline' },
+  { id: 'store', label: 'Store', section: 'trace' },
+  { id: 'format', label: 'Format', section: 'trace' },
+];
+
+// Mock report data
+const MOCK_REPORT = {
+  analysis_id: 'a3f9c7e2',
+  predicted_class: 'mixed_urban_agricultural',
+  confidence: 4,
+  observed_features: 'The synthesized description reports four distinct land covers within a single frame: rectilinear cropland occupying the upper-left quadrant with two parallel furrow orientations (38° and -12°) indicating multi-field row-crop agriculture; a continuous tree canopy in the upper-right consistent with mature mixed woodland, with no grid alignment; a built-up urban grid in the lower-right showing parallel roof signatures, a 3px-wide arterial road bisecting the area east-west and a second crossing it north-south; and a meandering hydrographic feature traversing the frame diagonally from west to east, with a small artificial reservoir (~22m × 14m) embedded in the forest section.',
+  classification_reasoning: 'Because the user-supplied taxonomy includes the class "mixed_urban_agricultural" and the image presents both row-crop signatures (upper-left) and dense built environment (lower-right) within the same frame with comparable area coverage, the model selected mixed_urban_agricultural over more specific classes such as cropland or urban_dev. Neither single-cover class adequately describes the scene; the spatial co-occurrence of row-crop geometry and an urban grid within the frame is the determining signal.',
+  context_corroboration: 'Three priors were retrieved within the configured 5km radius, all classified as mixed_urban_agricultural with confidence ≥ 4 and cosine similarities of 0.87, 0.82, and 0.79. The closest prior (0.31km, 8 months ago) describes substantially the same field-and-grid composition, increasing confidence that this is a stable mixed-use area rather than a transitional region undergoing development.',
+  alternative_classes: null,
+  ambiguity_reason: null,
+  synthesized_description: 'The image contains four spatially distinct land covers within a single frame. The upper-left quadrant (approximately tiles [0,0], [0,1], and the western portion of [0,2]) is cultivated cropland presenting two field orientations: a larger southwest-aligned set of rows at roughly 38° and a smaller northwest-aligned set at -12°. Field boundaries are sharp and rectilinear, with darker strips at the borders consistent with drainage ditches or unplanted margins. Three small concrete structures appear within the cropland area, in the upper-center (around tile [0,1]), the center (around tile [1,1] near the field boundary), and the western edge (around tile [1,0]); their size (~5-7px equivalent) suggests outbuildings or farm equipment shelters rather than dwellings. The upper-right quadrant (tile [0,2] and the eastern portion of [1,2]) shows a continuous tree canopy with irregular crown spacing and non-grid-aligned boundaries, consistent with natural mature woodland; embedded near the western edge of the forest at approximately tile [0,2] center is an artificial reservoir of roughly 22m × 14m with sharp boundaries inconsistent with a natural pond. The lower-right (tiles [1,2] and [2,2]) is densely built urban, with parallel roof signatures arranged in regular blocks, bisected by a 3-pixel-wide east-west arterial road and a perpendicular north-south road of similar dimension. A meandering watercourse traverses the entire frame diagonally from the western edge (tile [1,0] lower area) to the eastern edge (tile [2,2] center), passing through the urban area and forming the apparent boundary between cropland and the forest-urban regions. Lighting suggests overhead solar acquisition with minimal cloud shadow.',
+  patch_descriptions: [
+    'Tile [0,0]: Predominantly cropland with parallel row patterns oriented at roughly 38° from horizontal. The lower-right corner of the tile contains the edge of a second field with a different row orientation, suggesting a property boundary running diagonally. No structures visible. Dominant color is desaturated olive-green consistent with mid-stage cereal crops.',
+    'Tile [0,1]: Continuation of the upper-left cropland. A small concrete structure (approximately 5-7px equivalent, light-gray) sits in the upper-center of the tile, likely a farm outbuilding or pump house given its isolation from any road network. Field rows continue in the same 38° orientation. No vegetation breaks or anomalies otherwise.',
+    'Tile [0,2]: Transition tile. The western third is the eastern edge of the cropland; the central and eastern portions show continuous mature tree canopy. An elliptical water feature (approximately 22m × 14m at scale) sits near the center of the tile with sharp, geometric boundaries, indicating an artificial reservoir or holding pond rather than a natural water body. No structures.',
+    'Tile [1,0]: Western edge of the cropland. A second field with a -12° row orientation occupies the upper-right half of the tile, meeting the 38° field along a sharp diagonal. The lower portion of the tile shows the beginning of a meandering watercourse entering from the west. A small concrete structure (~5px) sits in the western edge near the field boundary.',
+    'Tile [1,1]: Center of the frame. The upper-left portion is the southeast corner of the -12° field; the upper-right is the southwest edge of the tree canopy. A concrete structure (~7px equivalent) sits at the field-forest boundary in the center-left, possibly a transition building. The meandering watercourse cuts across the lower portion of the tile from west to east.',
+    'Tile [1,2]: Mixed tile. The upper-left transitions from mature forest into the northern edge of the urban grid; the lower-right shows regular roof patterns and the first segment of the east-west arterial road. The watercourse exits the tile to the east, beneath what appears to be a small bridge or culvert at the road crossing.',
+    'Tile [2,0]: Sparsely featured. The northern third continues the lower edge of the cropland; the rest is open ground or low vegetation, possibly fallow field or pasture. The watercourse continues across the upper portion. No structures.',
+    'Tile [2,1]: The watercourse occupies the upper portion. Lower portion is undifferentiated low vegetation with no clear field structure or built environment. A possible footpath or unpaved track runs north-south near the eastern edge.',
+    'Tile [2,2]: Densely built urban. Regular roof signatures in a grid pattern, bisected by a north-south road meeting the east-west arterial near the center. Roof dimensions vary (approximately 8-14px), consistent with mixed residential and small-commercial development. Cars (small, ~3px) visible on the road segments.',
+  ],
+  retrieved_context: [
+    { timestamp: '2025-08-19', distance_km: 0.31, predicted_class: 'mixed_urban_agricultural', confidence: 5, cosine: 0.87, snippet: 'Cropland (NW) abutting urban grid (SE) with a watercourse forming the boundary. Three small outbuildings in the agricultural zone. Identical composition to current frame.' },
+    { timestamp: '2025-04-02', distance_km: 1.42, predicted_class: 'mixed_urban_agricultural', confidence: 4, cosine: 0.82, snippet: 'Adjacent area, slightly to the north. Field orientations are 35° and -10° (comparable to current). Forest canopy in the north occupies a slightly larger share. Same arterial road extends through.' },
+    { timestamp: '2024-11-08', distance_km: 2.87, predicted_class: 'mixed_urban_agricultural', confidence: 4, cosine: 0.79, snippet: 'Same urban-agricultural mosaic 2.9km southwest. Reservoir feature is absent here but otherwise consistent. Watercourse runs in roughly the same direction.' },
+  ],
+  retrieval_radius_km: 5,
+  retrieval_time_window: 'All',
+  relaxation_applied: [],
+  used_clustering: false,
+  used_retry: false,
+  used_clip_fallback: false,
+  vllm_model: 'groq/llama-3.2-vision',
+  llm_model: 'gemini-2.5-flash',
+  total_latency_ms: 4830,
+  was_tiled: true,
+  num_patches: 9,
+};
+
+const PatchedImageVisual = () => (
+  <svg viewBox="0 0 320 220" style={{ width: '100%', height: '100%', display: 'block' }} preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <pattern id="cropfield" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(38)">
+        <rect width="5" height="5" fill="#5a6b1f"/>
+        <rect width="1.6" height="5" fill="#7a8e2b"/>
+      </pattern>
+      <pattern id="cropfield2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-12)">
+        <rect width="5" height="5" fill="#7a8e2b"/>
+        <rect width="1.4" height="5" fill="#5a6b1f"/>
+      </pattern>
+      <pattern id="urbanpat" width="9" height="9" patternUnits="userSpaceOnUse">
+        <rect width="9" height="9" fill="#3a3d44"/>
+        <rect x="0.5" y="0.5" width="3.5" height="3" fill="#5a5e68"/>
+        <rect x="5" y="0.5" width="3" height="3.5" fill="#4a4e58"/>
+        <rect x="0.5" y="5" width="4" height="3" fill="#52565e"/>
+        <rect x="5.5" y="5.5" width="2.5" height="2.5" fill="#5e6270"/>
+      </pattern>
+      <pattern id="forestpat" width="6" height="6" patternUnits="userSpaceOnUse">
+        <rect width="6" height="6" fill="#1a3d22"/>
+        <circle cx="3" cy="3" r="1.8" fill="#2a5a32"/>
+        <circle cx="3" cy="3" r="0.7" fill="#3a7a42" opacity="0.6"/>
+      </pattern>
+      <linearGradient id="waterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#1e3a55"/>
+        <stop offset="100%" stopColor="#0f253a"/>
+      </linearGradient>
+    </defs>
+
+    <rect width="320" height="220" fill="#2a2d34"/>
+
+    {/* Cropland fields: upper-left quadrant, multiple rotated rectangles */}
+    <rect x="0" y="0" width="160" height="115" fill="url(#cropfield)"/>
+    <rect x="58" y="0" width="60" height="55" fill="url(#cropfield2)"/>
+    <rect x="0" y="55" width="55" height="60" fill="url(#cropfield2)"/>
+    <line x1="0" y1="55" x2="160" y2="55" stroke="#3a3d34" strokeWidth="0.8"/>
+    <line x1="58" y1="0" x2="58" y2="115" stroke="#3a3d34" strokeWidth="0.8"/>
+
+    {/* Urban: lower-right quadrant */}
+    <rect x="180" y="115" width="140" height="105" fill="url(#urbanpat)"/>
+    {/* Streets cutting through urban */}
+    <rect x="180" y="155" width="140" height="3" fill="#22252a"/>
+    <rect x="240" y="115" width="3" height="105" fill="#22252a"/>
+
+    {/* Forest patch: upper right */}
+    <path d="M 175 0 L 320 0 L 320 100 Q 290 115, 250 105 Q 220 95, 195 105 Q 175 110, 175 95 Z" fill="url(#forestpat)"/>
+
+    {/* River meandering diagonally */}
+    <path d="M 0 130 Q 50 138, 90 145 Q 130 152, 165 160 Q 190 168, 215 175 Q 240 182, 270 175 Q 300 168, 320 158"
+      fill="none" stroke="url(#waterGrad)" strokeWidth="11" strokeLinecap="round"/>
+    <path d="M 0 130 Q 50 138, 90 145 Q 130 152, 165 160 Q 190 168, 215 175 Q 240 182, 270 175 Q 300 168, 320 158"
+      fill="none" stroke="#2c5070" strokeWidth="11" strokeLinecap="round" opacity="0.4"/>
+
+    {/* Small reservoir / pond */}
+    <ellipse cx="232" cy="60" rx="22" ry="14" fill="url(#waterGrad)" stroke="#1a3550" strokeWidth="1"/>
+
+    {/* A few scattered roof signatures (small concrete structures) */}
+    <rect x="78" y="22" width="6" height="5" fill="#7a7e88"/>
+    <rect x="120" y="68" width="7" height="6" fill="#7a7e88"/>
+    <rect x="32" y="80" width="5" height="5" fill="#7a7e88"/>
+
+    {/* Subtle vignette */}
+    <rect width="320" height="220" fill="url(#vignette)" opacity="0.3"/>
+    <defs>
+      <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+        <stop offset="60%" stopColor="transparent"/>
+        <stop offset="100%" stopColor="rgba(0,0,0,0.4)"/>
+      </radialGradient>
+    </defs>
+  </svg>
+);
+
+const ProgressBar = ({ activeStage }) => {
+  const activeIdx = STAGES.findIndex(s => s.id === activeStage);
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '12px 20px',
+      background: DS.card,
+      border: `1px solid ${DS.border}`,
+      borderRadius: 8,
+      fontFamily: DS.mono, fontSize: 10,
+    }}>
+      <span style={{ color: DS.fg3, letterSpacing: '0.12em', marginRight: 8 }}>STAGE</span>
+      {STAGES.map((s, i) => {
+        const passed = activeIdx >= i;
+        const current = activeIdx === i;
+        return (
+          <React.Fragment key={s.id}>
+            <span style={{
+              padding: '4px 8px',
+              borderRadius: 4,
+              background: passed ? (current ? DS.primarySubtle : 'rgba(16,185,129,0.10)') : 'rgba(255,255,255,0.03)',
+              color: passed ? (current ? DS.primary : DS.success) : DS.fg3,
+              border: `1px solid ${passed ? (current ? DS.primaryBorder : 'rgba(16,185,129,0.18)') : 'rgba(255,255,255,0.05)'}`,
+              fontWeight: 500,
+              letterSpacing: '0.04em',
+              transition: 'all 250ms ease',
+            }}>{s.label.toLowerCase()}</span>
+            {i < STAGES.length - 1 && <span style={{ color: DS.fg3, fontSize: 8 }}>→</span>}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
+const ReportSection = ({ children, populated, style = {} }) => {
+  if (!populated) {
+    return (
+      <div style={{
+        background: DS.card, border: `1px solid ${DS.border}`,
+        borderRadius: 8, padding: 20, ...style,
+      }}>
+        <div className="gs-skeleton" style={{ height: 12, width: '40%', marginBottom: 12 }}/>
+        <div className="gs-skeleton" style={{ height: 9, width: '90%', marginBottom: 6 }}/>
+        <div className="gs-skeleton" style={{ height: 9, width: '85%', marginBottom: 6 }}/>
+        <div className="gs-skeleton" style={{ height: 9, width: '60%' }}/>
+      </div>
+    );
+  }
+  return <div className="gs-fade-up" style={{
+    background: DS.card, border: `1px solid ${DS.border}`,
+    borderRadius: 8, ...style,
+  }}>{children}</div>;
+};
+
+const HeadlineSection = ({ data, populated }) => {
+  if (!populated) {
+    return (
+      <div style={{
+        background: DS.card, border: `1px solid ${DS.border}`,
+        borderRadius: 8, padding: 24, display: 'flex', gap: 24,
+      }}>
+        <div className="gs-skeleton" style={{ width: 160, height: 110, borderRadius: 6, flexShrink: 0 }}/>
+        <div style={{ flex: 1 }}>
+          <div className="gs-skeleton" style={{ width: '30%', height: 11, marginBottom: 14 }}/>
+          <div className="gs-skeleton" style={{ width: '50%', height: 32, marginBottom: 12 }}/>
+          <div className="gs-skeleton" style={{ width: '95%', height: 11, marginBottom: 6 }}/>
+          <div className="gs-skeleton" style={{ width: '70%', height: 11 }}/>
+        </div>
+      </div>
+    );
+  }
+  const glowColor = data.confidence >= 4 ? 'rgba(16,185,129,0.20)' : data.confidence >= 3 ? 'rgba(245,158,11,0.20)' : 'rgba(239,68,68,0.20)';
+
+  return (
+    <div className="gs-fade-up" style={{
+      background: DS.card,
+      border: `1px solid ${DS.border}`,
+      borderRadius: 8, padding: 24,
+      display: 'flex', gap: 24,
+      boxShadow: `0 0 24px ${glowColor}`,
+    }}>
+      <div style={{
+        width: 160, height: 110,
+        borderRadius: 6, overflow: 'hidden',
+        background: '#0f3a26',
+        position: 'relative',
+        flexShrink: 0,
+        border: `1px solid ${DS.border}`,
+      }}>
+        <PatchedImageVisual/>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <Eyebrow color={DS.success}>● CLASSIFIED</Eyebrow>
+          <ConfidenceLabel score={data.confidence}/>
+          <ConfidenceDots score={data.confidence}/>
+        </div>
+        <div style={{
+          fontFamily: DS.display, fontSize: 38, fontWeight: 700,
+          color: DS.fg, letterSpacing: '-0.025em', marginBottom: 8,
+          lineHeight: 1,
+        }}>{data.predicted_class}</div>
+        <div style={{ fontSize: 13, color: DS.fg2, lineHeight: 1.5, fontWeight: 300, marginBottom: 12 }}>
+          Cultivated cropland abutting a dense urban grid, separated by a meandering watercourse.
+          No ambiguity flags raised; no fallback engaged.
+        </div>
+        <div style={{ display: 'flex', gap: 16, fontFamily: DS.mono, fontSize: 11, color: DS.fg3, flexWrap: 'wrap' }}>
+          <span>analysis_id <span style={{ color: DS.fg2 }}>{data.analysis_id}</span></span>
+          <span>•</span>
+          <span>retrieved <span style={{ color: DS.fg2 }}>{data.retrieved_context.length} priors</span></span>
+          <span>•</span>
+          <span>radius <span style={{ color: DS.fg2 }}>{data.retrieval_radius_km}km</span></span>
+          <span>•</span>
+          <span>elapsed <span style={{ color: DS.fg2 }}>{(data.total_latency_ms/1000).toFixed(2)}s</span></span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VisualEvidenceSection = ({ data, populated }) => {
+  const [showPatches, setShowPatches] = useState(false);
+  if (!populated) return <ReportSection populated={false} style={{ padding: 20 }}/>;
+
+  return (
+    <div className="gs-fade-up" style={{
+      background: DS.card, border: `1px solid ${DS.border}`,
+      borderRadius: 8, overflow: 'hidden',
+    }}>
+      <div style={{ padding: '16px 20px 14px', borderBottom: `1px solid ${DS.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Icon name="eye" size={14} color={DS.primary}/>
+          <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg2, letterSpacing: '0.12em', fontWeight: 500 }}>VISUAL EVIDENCE · vLLM</span>
+          <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, marginLeft: 'auto' }}>{data.vllm_model}</span>
+        </div>
+      </div>
+      <div style={{ padding: 20, maxHeight: 240, overflowY: 'auto' }}>
+        <div style={{ fontFamily: DS.body, fontSize: 13.5, color: DS.fg2, lineHeight: 1.65, fontWeight: 300 }}>
+          {data.synthesized_description}
+        </div>
+      </div>
+      {data.was_tiled && (
+        <div style={{ borderTop: `1px solid ${DS.border}` }}>
+          <button onClick={() => setShowPatches(!showPatches)} style={{
+            width: '100%', padding: '12px 20px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            color: DS.fg2,
+            transition: 'all 150ms ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <span style={{ fontFamily: DS.mono, fontSize: 11, letterSpacing: '0.08em' }}>
+              PER-PATCH DESCRIPTIONS · {data.num_patches} TILES
+            </span>
+            <Icon name="chevronDown" size={12} color={DS.fg3} style={{ transform: showPatches ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}/>
+          </button>
+          {showPatches && (
+            <div style={{ padding: '0 20px 20px', maxHeight: 280, overflowY: 'auto' }}>
+              {data.patch_descriptions.map((p, i) => (
+                <div key={i} style={{
+                  padding: '10px 14px',
+                  background: 'rgba(255,255,255,0.025)',
+                  borderRadius: 6,
+                  border: `1px solid ${DS.border}`,
+                  marginBottom: 6,
+                  fontFamily: DS.body, fontSize: 12.5, color: DS.fg2, lineHeight: 1.55, fontWeight: 300,
+                }}>
+                  <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.primary, letterSpacing: '0.06em', marginRight: 8 }}>
+                    [{Math.floor(i/3)},{i%3}]
+                  </span>
+                  {p.replace(/^Tile \[\d,\d\]: /, '')}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const InterpretationSection = ({ data, populated }) => {
+  if (!populated) return <ReportSection populated={false} style={{ padding: 20 }}/>;
+
+  const Sub = ({ label, children }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{
+        fontFamily: DS.mono, fontSize: 10, color: DS.fg3,
+        letterSpacing: '0.12em', fontWeight: 500, marginBottom: 6,
+        textTransform: 'uppercase',
+      }}>{label}</div>
+      <div style={{ fontFamily: DS.body, fontSize: 13.5, color: DS.fg2, lineHeight: 1.65, fontWeight: 300 }}>
+        {children}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="gs-fade-up" style={{
+      background: DS.card, border: `1px solid ${DS.border}`,
+      borderRadius: 8,
+    }}>
+      <div style={{ padding: '16px 20px 14px', borderBottom: `1px solid ${DS.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon name="cpu" size={14} color={DS.primary}/>
+        <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg2, letterSpacing: '0.12em', fontWeight: 500 }}>LLM INTERPRETATION</span>
+        <span style={{
+          padding: '2px 7px', borderRadius: 4,
+          background: 'rgba(245,158,11,0.10)',
+          border: '1px solid rgba(245,158,11,0.25)',
+          color: '#fcd34d',
+          fontFamily: DS.mono, fontSize: 9.5, letterSpacing: '0.10em', fontWeight: 500,
+        }}>MODEL-GENERATED</span>
+        <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, marginLeft: 'auto' }}>{data.llm_model}</span>
+      </div>
+      <div style={{ padding: 20, maxHeight: 360, overflowY: 'auto' }}>
+        {data.observed_features && (
+          <Sub label="Observed features">{data.observed_features}</Sub>
+        )}
+        {data.classification_reasoning && (
+          <Sub label="Classification reasoning">{data.classification_reasoning}</Sub>
+        )}
+        {data.context_corroboration && (
+          <Sub label="Context corroboration">{data.context_corroboration}</Sub>
+        )}
+        {(data.alternative_classes || data.ambiguity_reason) && (
+          <div style={{ marginTop: 4, paddingTop: 14, borderTop: `1px solid ${DS.border}` }}>
+            <div style={{
+              fontFamily: DS.mono, fontSize: 10, color: DS.fg3,
+              letterSpacing: '0.12em', fontWeight: 500, marginBottom: 8,
+              textTransform: 'uppercase',
+            }}>Alternatives considered</div>
+            {data.alternative_classes && (
+              <div style={{ marginBottom: 6 }}>
+                <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg3 }}>alternative_classes: </span>
+                <span style={{ fontFamily: DS.mono, fontSize: 11.5, color: DS.fg }}>
+                  [{data.alternative_classes.map(c => `"${c}"`).join(', ')}]
+                </span>
+              </div>
+            )}
+            {data.ambiguity_reason && (
+              <div>
+                <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg3 }}>ambiguity_reason: </span>
+                <span style={{ fontFamily: DS.body, fontSize: 12.5, color: DS.fg2, lineHeight: 1.5, fontWeight: 300 }}>
+                  {data.ambiguity_reason}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PriorContextSection = ({ data, populated }) => {
+  if (!populated) return <ReportSection populated={false} style={{ padding: 20 }}/>;
+
+  return (
+    <div className="gs-fade-up" style={{
+      background: DS.card, border: `1px solid ${DS.border}`,
+      borderRadius: 8,
+    }}>
+      <div style={{ padding: '16px 20px 14px', borderBottom: `1px solid ${DS.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon name="database" size={14} color={DS.primary}/>
+        <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg2, letterSpacing: '0.12em', fontWeight: 500 }}>
+          PRIOR CONTEXT · {data.retrieved_context.length} RETRIEVED
+        </span>
+        <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, marginLeft: 'auto' }}>
+          radius {data.retrieval_radius_km}km · window {data.retrieval_time_window} · cosine sim shown
+        </span>
+      </div>
+      <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        {data.retrieved_context.map((ctx, i) => (
+          <div key={i} style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: `1px solid ${DS.border}`,
+            borderRadius: 6,
+            padding: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg2 }}>{ctx.timestamp}</span>
+              <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.success, fontWeight: 500 }}>{ctx.cosine.toFixed(2)}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <Icon name="layers" size={10} color={DS.fg3}/>
+              <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {ctx.predicted_class}
+              </span>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, marginLeft: 'auto' }}>
+                {ctx.distance_km.toFixed(2)} km · c{ctx.confidence}
+              </span>
+            </div>
+            <div style={{ fontSize: 11.5, color: DS.fg2, lineHeight: 1.5, fontWeight: 300 }}>{ctx.snippet}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const PipelineTraceSection = ({ data, populated }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!populated) return <ReportSection populated={false} style={{ padding: 20 }}/>;
+
+  return (
+    <div className="gs-fade-up" style={{
+      background: DS.card, border: `1px solid ${DS.border}`, borderRadius: 8,
+    }}>
+      <button onClick={() => setExpanded(!expanded)} style={{
+        width: '100%', padding: '14px 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Icon name="branch" size={14} color={DS.primary}/>
+          <span style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg2, letterSpacing: '0.12em', fontWeight: 500 }}>PIPELINE TRACE</span>
+        </div>
+        <Icon name="chevronDown" size={12} color={DS.fg3} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}/>
+      </button>
+      {expanded && (
+        <div style={{ padding: '0 20px 20px', borderTop: `1px solid ${DS.border}` }}>
+          <table style={{ width: '100%', fontFamily: DS.mono, fontSize: 12, marginTop: 14 }}>
+            <tbody>
+              {[
+                ['used_clustering', String(data.used_clustering)],
+                ['used_retry', String(data.used_retry)],
+                ['used_clip_fallback', String(data.used_clip_fallback)],
+                ['was_tiled', `${String(data.was_tiled)} (${data.num_patches} patches)`],
+                ['vllm_model', data.vllm_model],
+                ['llm_model', data.llm_model],
+                ['total_latency', `${data.total_latency_ms}ms`],
+              ].map(([k, v]) => (
+                <tr key={k}>
+                  <td style={{ padding: '5px 0', color: DS.fg3, width: 180 }}>{k}</td>
+                  <td style={{ padding: '5px 0', color: DS.fg2 }}>{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AnalysisPage = () => {
+  const [coords, setCoords] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [classes, setClasses] = useState(['dense_forest', 'cropland', 'water_body', 'urban_dev', 'deforestation']);
+  const [newClass, setNewClass] = useState('');
+  const [radius, setRadius] = useState('5km');
+  const [temporal, setTemporal] = useState('All');
+  const [imageUploaded, setImageUploaded] = useState(false);
+  const [reportState, setReportState] = useState('idle'); // idle | running | done
+  const [activeStage, setActiveStage] = useState(null);
+  const [populatedSections, setPopulatedSections] = useState(new Set());
+  const fileInputRef = useRef(null);
+
+  const handleRun = () => {
+    if (reportState === 'running') return;
+    setReportState('running');
+    setPopulatedSections(new Set());
+
+    // Simulate progressive reveal
+    const timeline = [
+      { t: 200, stage: 'validate' },
+      { t: 600, stage: 'preprocess' },
+      { t: 1100, stage: 'describe' },
+      { t: 2200, stage: 'synthesize', section: 'visual' },
+      { t: 2700, stage: 'retrieve', section: 'priors' },
+      { t: 3500, stage: 'classify', section: 'headline' },
+      { t: 3800, stage: 'classify', section: 'interpretation' },
+      { t: 4000, stage: 'store' },
+      { t: 4200, stage: 'format', section: 'trace', done: true },
+    ];
+
+    timeline.forEach(({ t, stage, section, done }) => {
+      setTimeout(() => {
+        setActiveStage(stage);
+        if (section) setPopulatedSections(prev => new Set([...prev, section]));
+        if (done) setReportState('done');
+      }, t);
+    });
+  };
+
+  const reset = () => {
+    setReportState('idle');
+    setActiveStage(null);
+    setPopulatedSections(new Set());
+  };
+
+  const addClass = () => {
+    const c = newClass.trim().toLowerCase().replace(/\s+/g, '_');
+    if (c && !classes.includes(c) && classes.length < 50) {
+      setClasses([...classes, c]);
+      setNewClass('');
+    }
+  };
+
+  const canRun = imageUploaded && coords && classes.length >= 2;
+
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '40fr 60fr', minHeight: 'calc(100vh - 64px)' }}>
+
+        {/* ============ LEFT PANEL ============ */}
+        <div style={{
+          background: DS.surface, borderRight: `1px solid ${DS.border}`,
+          padding: '32px 36px', overflowY: 'auto', maxHeight: 'calc(100vh - 64px)',
+        }}>
+          <Eyebrow>§ ANALYSIS · CONFIGURE</Eyebrow>
+          <h2 style={{ fontFamily: DS.display, fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em', color: DS.fg, marginTop: 8, marginBottom: 8 }}>
+            Run a classification
+          </h2>
+          <div style={{ fontSize: 13.5, color: DS.fg2, lineHeight: 1.55, fontWeight: 300, marginBottom: 32 }}>
+            Submit an RGB satellite image, a coordinate, and a class taxonomy. The agent fans
+            out per-patch description, retrieves prior context, then classifies.
+          </div>
+
+          {/* IMAGERY */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Eyebrow>01 · IMAGERY</Eyebrow>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.08em' }}>PNG · JPEG · ≤20MB</span>
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
+              onChange={() => setImageUploaded(true)}/>
+            <div onClick={() => fileInputRef.current?.click()} style={{
+              background: imageUploaded ? 'rgba(16,185,129,0.05)' : DS.card,
+              border: `1px dashed ${imageUploaded ? DS.success : DS.borderMid}`,
+              borderRadius: 8, padding: '32px 16px',
+              textAlign: 'center', cursor: 'pointer',
+              transition: 'all 200ms ease',
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%',
+                background: imageUploaded ? 'rgba(16,185,129,0.1)' : DS.primarySubtle,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+              }}>
+                <Icon name={imageUploaded ? 'check' : 'upload'} size={16} color={imageUploaded ? DS.success : DS.primary}/>
+              </div>
+              <div style={{ fontFamily: DS.body, fontSize: 14, fontWeight: 500, color: DS.fg, marginBottom: 4 }}>
+                {imageUploaded ? 'satellite_image.png' : 'Drop satellite imagery here'}
+              </div>
+              <div style={{ fontSize: 11.5, color: DS.fg3 }}>
+                {imageUploaded ? 'Click to replace' : 'or click to browse · RGB only · 224px min'}
+              </div>
+            </div>
+          </div>
+
+          {/* COORDINATES */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Eyebrow>02 · COORDINATES</Eyebrow>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.08em' }}>WGS-84 decimal</span>
+            </div>
+            <button onClick={() => setPickerOpen(true)} style={{
+              width: '100%',
+              background: coords ? 'rgba(14,165,233,0.05)' : DS.card,
+              border: `1px solid ${coords ? DS.primaryBorder : DS.border}`,
+              borderRadius: 6, padding: '12px 14px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              transition: 'all 200ms ease',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon name="mapPin" size={14} color={coords ? DS.primary : DS.fg2}/>
+                {coords ? (
+                  <span style={{ fontFamily: DS.mono, fontSize: 12, color: DS.fg }}>
+                    lat: {coords.lat.toFixed(6)}, lon: {coords.lon.toFixed(6)}
+                  </span>
+                ) : (
+                  <span style={{ fontFamily: DS.body, fontSize: 13, color: DS.fg2 }}>Select coordinates</span>
+                )}
+              </div>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.primary, letterSpacing: '0.08em' }}>
+                {coords ? 'EDIT' : 'PICK ON MAP →'}
+              </span>
+            </button>
+          </div>
+
+          {/* CLASS TAXONOMY */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Eyebrow>03 · CLASS TAXONOMY</Eyebrow>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.08em' }}>{classes.length} of 50 max</span>
+            </div>
+            <div style={{
+              background: DS.card, border: `1px solid ${DS.border}`,
+              borderRadius: 6, padding: 10,
+              display: 'flex', flexWrap: 'wrap', gap: 6,
+            }}>
+              {classes.map(c => (
+                <span key={c} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '4px 8px 4px 10px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${DS.border}`,
+                  borderRadius: 4,
+                  fontFamily: DS.mono, fontSize: 11.5, color: DS.fg, fontWeight: 500,
+                  letterSpacing: '0.02em',
+                }}>
+                  {c}
+                  <button onClick={() => setClasses(classes.filter(x => x !== c))} style={{
+                    color: DS.fg3, padding: 0, lineHeight: 0,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.color = DS.error}
+                  onMouseLeave={e => e.currentTarget.style.color = DS.fg3}>
+                    <Icon name="x" size={11}/>
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={newClass}
+                onChange={e => setNewClass(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addClass(); } }}
+                placeholder="+ add class…"
+                style={{
+                  background: 'transparent', border: 'none', outline: 'none',
+                  color: DS.fg, fontFamily: DS.mono, fontSize: 11.5,
+                  padding: '4px 6px', minWidth: 100, flex: 1,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* RAG RADIUS */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Eyebrow>04 · RAG · RADIAL DISTANCE</Eyebrow>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.08em' }}>geo_radius filter</span>
+            </div>
+            <ToggleGroup value={radius} onChange={setRadius} options={[
+              { value: '500m', label: '500m' },
+              { value: '1km', label: '1km' },
+              { value: '5km', label: '5km' },
+              { value: '10km', label: '10km' },
+              { value: '50km', label: '50km' },
+            ]}/>
+          </div>
+
+          {/* RAG TEMPORAL */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Eyebrow>05 · RAG · TEMPORAL DEPTH</Eyebrow>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.08em' }}>optional time filter</span>
+            </div>
+            <ToggleGroup value={temporal} onChange={setTemporal} options={[
+              { value: '6M', label: '6M' },
+              { value: '1Y', label: '1Y' },
+              { value: '3Y', label: '3Y' },
+              { value: 'All', label: 'All' },
+            ]}/>
+          </div>
+
+          {/* RUN BUTTON */}
+          <Button
+            variant="primary" size="lg" full
+            icon={reportState === 'running' ? null : 'play'}
+            disabled={!canRun && reportState === 'idle'}
+            loading={reportState === 'running'}
+            onClick={reportState === 'done' ? reset : handleRun}
+          >
+            {reportState === 'running' ? 'Analyzing…' :
+             reportState === 'done' ? 'Run new analysis' :
+             'Run Analysis'}
+          </Button>
+          {!canRun && reportState === 'idle' && (
+            <div style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, marginTop: 8, textAlign: 'center', letterSpacing: '0.04em' }}>
+              {!imageUploaded ? 'Upload an image to continue' : !coords ? 'Select coordinates to continue' : 'Add at least 2 classes'}
+            </div>
+          )}
+        </div>
+
+        {/* ============ RIGHT PANEL ============ */}
+        <div style={{ background: DS.bg, padding: '24px 28px', overflowY: 'auto', maxHeight: 'calc(100vh - 64px)' }}>
+
+          {reportState === 'idle' && (
+            <div style={{
+              height: 'calc(100vh - 112px)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <div style={{ textAlign: 'center', maxWidth: 440 }}>
+                <div style={{
+                  width: 60, height: 60, borderRadius: '50%',
+                  background: DS.primarySubtle,
+                  border: `1px solid ${DS.primaryBorder}`,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 20,
+                }}>
+                  <Icon name="target" size={26} color={DS.primary}/>
+                </div>
+                <div style={{ fontFamily: DS.display, fontSize: 22, fontWeight: 600, color: DS.fg, marginBottom: 8 }}>
+                  Your analysis will appear here
+                </div>
+                <div style={{ fontSize: 13.5, color: DS.fg2, lineHeight: 1.6, fontWeight: 300 }}>
+                  Configure inputs on the left and run the pipeline. The report streams in section by
+                  section as the agent completes each stage.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {reportState !== 'idle' && (
+            <>
+              {/* Top bar with stage progress */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                  <Eyebrow>§ REPORT · ANALYSIS_ID {MOCK_REPORT.analysis_id}</Eyebrow>
+                  <div style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg3, marginTop: 2 }}>
+                    ts 2026-04-25 14:32:08Z · {MOCK_REPORT.llm_model} · {MOCK_REPORT.vllm_model}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button variant="ghost" size="sm" icon="bookmark">Save</Button>
+                  <Button variant="ghost" size="sm" icon="download">Export JSON</Button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <ProgressBar activeStage={activeStage}/>
+              </div>
+
+              {/* Sections */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <HeadlineSection data={MOCK_REPORT} populated={populatedSections.has('headline')}/>
+                <VisualEvidenceSection data={MOCK_REPORT} populated={populatedSections.has('visual')}/>
+                <InterpretationSection data={MOCK_REPORT} populated={populatedSections.has('interpretation')}/>
+                <PriorContextSection data={MOCK_REPORT} populated={populatedSections.has('priors')}/>
+                <PipelineTraceSection data={MOCK_REPORT} populated={populatedSections.has('trace')}/>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <CoordinatePicker
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={setCoords}
+        initialLat={coords?.lat}
+        initialLon={coords?.lon}
+      />
+    </>
+  );
+};
+
+// ================== ARCHIVE PAGE ==================
+
+const ARCHIVE_RECORDS = [
+  { id: 1, cls: 'dense_forest', conf: 5, ts: '2026-04-21', lat: 47.6762, lon: -122.3621, snippet: 'Confirmed old-growth canopy via multi-spectral analysis. No anomalous structures detected within 1.2km radius.', color: '#34d399' },
+  { id: 2, cls: 'water_body', conf: 5, ts: '2026-04-18', lat: 47.6450, lon: -122.3070, snippet: 'Reservoir capacity estimated at 85%. Minor algae bloom signature near northern shore.', color: '#67e8f9' },
+  { id: 3, cls: 'urban_dev', conf: 4, ts: '2026-03-15', lat: 47.6062, lon: -122.3321, snippet: 'New infrastructure patterns identified. Requires secondary SAR verification before commit.', color: '#cbd5e1' },
+  { id: 4, cls: 'deforestation', conf: 4, ts: '2026-02-08', lat: 47.5650, lon: -122.3850, snippet: 'Significant loss of canopy cover detected. Alert flagged for human review.', color: '#fca5a5' },
+  { id: 5, cls: 'cropland', conf: 5, ts: '2026-01-30', lat: 47.5470, lon: -122.2700, snippet: 'Regular grid signature consistent with row-crop agriculture. Late-stage growth phase.', color: '#fcd34d' },
+];
+
+const ArchivePage = () => {
+  const mapRef = useRef(null);
+  const mapInstance = useRef(null);
+  const markersRef = useRef([]);
+  const [filter, setFilter] = useState('high');
+  const [activeId, setActiveId] = useState(1);
+  const [viewMode, setViewMode] = useState('list'); // list | detail
+  const [center, setCenter] = useState([47.6062, -122.3321]);
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstance.current) return;
+
+    const map = L.map(mapRef.current, {
+      center: [47.6062, -122.3321],
+      zoom: 11,
+      zoomControl: false,
+      attributionControl: true,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OSM &copy; <a href="https://carto.com/attributions">CARTO</a> · dark_matter',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    map.on('moveend', () => {
+      const c = map.getCenter();
+      setCenter([c.lat, c.lng]);
+    });
+
+    ARCHIVE_RECORDS.forEach(r => {
+      const html = `
+        <div class="gs-reticle-marker" style="color: ${r.color}">
+          <div class="ring"></div>
+          <div class="dot"></div>
+          ${r.conf >= 4 ? '<div class="pulse"></div>' : ''}
+        </div>
+      `;
+      const icon = L.divIcon({ className: '', html, iconSize: [18,18], iconAnchor: [9,9] });
+      const marker = L.marker([r.lat, r.lon], { icon }).addTo(map);
+      marker.bindTooltip(`${r.cls.replace('_', ' ')} · ${r.conf}/5`, {
+        direction: 'top',
+        offset: [0, -10],
+        className: 'gs-tooltip',
+      });
+      marker.on('click', () => {
+        setActiveId(r.id);
+        setViewMode('detail');
+      });
+      markersRef.current.push({ id: r.id, marker });
+    });
+
+    mapInstance.current = map;
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, []);
+
+  const locateOnMap = (record) => {
+    setActiveId(record.id);
+    if (mapInstance.current) {
+      mapInstance.current.flyTo([record.lat, record.lon], 13, { duration: 0.8 });
+    }
+  };
+
+  const activeRecord = ARCHIVE_RECORDS.find(r => r.id === activeId);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '65fr 35fr', height: 'calc(100vh - 64px)' }}>
+      {/* MAP */}
+      <div style={{ position: 'relative', borderRight: `1px solid ${DS.border}`, minHeight: 0 }}>
+        <div ref={mapRef} style={{ position: 'absolute', inset: 0 }}/>
+
+        {/* Locate-me button */}
+        <button onClick={() => mapInstance.current?.flyTo([47.6062, -122.3321], 11, { duration: 0.8 })} style={{
+          position: 'absolute', top: 88, left: 10,
+          width: 30, height: 30,
+          background: 'rgba(13,21,32,0.9)',
+          border: `1px solid ${DS.border}`,
+          borderRadius: 4,
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: DS.fg2,
+          zIndex: 500,
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = DS.fg}
+        onMouseLeave={e => e.currentTarget.style.color = DS.fg2}>
+          <Icon name="crosshair" size={14}/>
+        </button>
+
+        {/* Viewport status */}
+        <div style={{
+          position: 'absolute', bottom: 24, left: 16,
+          background: 'rgba(13,21,32,0.92)',
+          border: `1px solid ${DS.border}`,
+          borderRadius: 6, backdropFilter: 'blur(10px)',
+          padding: '12px 14px', minWidth: 220,
+          zIndex: 500,
+        }}>
+          <div style={{ fontFamily: DS.mono, fontSize: 9, color: DS.fg3, letterSpacing: '0.14em', marginBottom: 6 }}>
+            VIEWPORT STATUS
+          </div>
+          <div style={{ fontFamily: DS.mono, fontSize: 11.5, color: DS.fg, lineHeight: 1.55 }}>
+            <div>LAT  {center[0].toFixed(4)}°</div>
+            <div>LNG  {center[1].toFixed(4)}°</div>
+          </div>
+          <div style={{ borderTop: `1px solid ${DS.border}`, marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg2 }}>visible</span>
+            <span style={{
+              fontFamily: DS.mono, fontSize: 11, fontWeight: 600,
+              padding: '1px 8px', borderRadius: 4,
+              background: DS.primarySubtle, color: DS.primaryHover,
+            }}>{ARCHIVE_RECORDS.length}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT PANEL */}
+      <div style={{ background: DS.surface, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {viewMode === 'list' ? (
+          <>
+            <div style={{ padding: '24px 28px 18px', borderBottom: `1px solid ${DS.border}`, flexShrink: 0 }}>
+              <Eyebrow>§ ARCHIVE · GET /history</Eyebrow>
+              <h2 style={{ fontFamily: DS.display, fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em', color: DS.fg, marginTop: 8 }}>
+                Archive Queries
+              </h2>
+              <div style={{ fontSize: 12, color: DS.fg3, marginTop: 2 }}>
+                {ARCHIVE_RECORDS.length} stored analyses · {ARCHIVE_RECORDS.length} in viewport
+              </div>
+            </div>
+
+            <div style={{ padding: '16px 28px', borderBottom: `1px solid ${DS.border}`, flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <Icon name="sliders" size={11} color={DS.fg2}/>
+                <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg2, letterSpacing: '0.14em', fontWeight: 500 }}>FILTERS</span>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontFamily: DS.mono, fontSize: 9, color: DS.fg3, letterSpacing: '0.10em', marginBottom: 6 }}>CONFIDENCE TIER</div>
+                <ToggleGroup value={filter} onChange={setFilter} options={[
+                  { value: 'all', label: 'All' },
+                  { value: 'high', label: 'High (4–5)' },
+                  { value: 'medium', label: 'Medium (3)' },
+                  { value: 'low', label: 'Low (1–2)' },
+                ]}/>
+              </div>
+              <div>
+                <div style={{ fontFamily: DS.mono, fontSize: 9, color: DS.fg3, letterSpacing: '0.10em', marginBottom: 6 }}>CLASS TYPE</div>
+                <button style={{
+                  width: '100%',
+                  background: DS.card, border: `1px solid ${DS.border}`,
+                  borderRadius: 6, padding: '8px 12px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  color: DS.fg, fontFamily: DS.body, fontSize: 12,
+                }}>
+                  <span>Any detection</span>
+                  <Icon name="chevronDown" size={12} color={DS.fg3}/>
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 24px', minHeight: 0 }}>
+              {ARCHIVE_RECORDS.map(r => {
+                const active = r.id === activeId;
+                return (
+                  <div key={r.id} onClick={() => setActiveId(r.id)} style={{
+                    background: active ? `linear-gradient(180deg, ${DS.primarySubtle}, rgba(14,165,233,0.04))` : 'transparent',
+                    border: `1px solid ${active ? DS.primaryBorder : 'transparent'}`,
+                    borderRadius: 6, padding: '12px 14px', marginBottom: 4,
+                    cursor: 'pointer', transition: 'all 150ms ease',
+                    position: 'relative',
+                  }}>
+                    {active && (
+                      <div style={{ position: 'absolute', left: -16, top: 14, bottom: 14, width: 2, background: DS.primary, borderRadius: 1 }}/>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color, boxShadow: `0 0 6px ${r.color}66` }}/>
+                        <span style={{ fontFamily: DS.mono, fontSize: 11.5, color: DS.fg, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          {r.cls.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <ConfidenceDots score={r.conf} size={6}/>
+                        <span style={{ fontFamily: DS.mono, fontSize: 11, color: r.conf >= 4 ? DS.success : r.conf >= 3 ? DS.warning : DS.error }}>{r.conf}/5</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: DS.fg2, lineHeight: 1.5, fontWeight: 300, marginBottom: 8 }}>
+                      {r.snippet}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3 }}>
+                        {r.ts} · {r.lat.toFixed(3)}°, {r.lon.toFixed(3)}°
+                      </span>
+                      <button onClick={(e) => { e.stopPropagation(); locateOnMap(r); }} style={{
+                        fontFamily: DS.mono, fontSize: 10, color: DS.primary,
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                      }}>
+                        Locate <Icon name="arrowRight" size={10}/>
+                      </button>
+                    </div>
+                    {active && (
+                      <button onClick={(e) => { e.stopPropagation(); setViewMode('detail'); }} style={{
+                        marginTop: 10, padding: '6px 12px',
+                        background: DS.primarySubtle, border: `1px solid ${DS.primaryBorder}`,
+                        borderRadius: 4, color: DS.primary,
+                        fontFamily: DS.body, fontSize: 11, fontWeight: 500,
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                      }}>
+                        Full Report <Icon name="arrowRight" size={10}/>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          // DETAIL VIEW — uses the same 5-section structure as Analysis report
+          <>
+            <div style={{
+              padding: '20px 28px',
+              borderBottom: `1px solid ${DS.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              flexShrink: 0,
+            }}>
+              <button onClick={() => setViewMode('list')} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontFamily: DS.body, fontSize: 12, color: DS.fg2,
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = DS.fg}
+              onMouseLeave={e => e.currentTarget.style.color = DS.fg2}>
+                <Icon name="chevronLeft" size={12}/> Back to archive
+              </button>
+              <span style={{ fontFamily: DS.mono, fontSize: 10, color: DS.fg3, letterSpacing: '0.06em' }}>
+                ID · {String(activeRecord.id).padStart(8, '0')}
+              </span>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
+              <div style={{ marginBottom: 14 }}>
+                <Eyebrow>§ STORED ANALYSIS · GET /analyses/{String(activeRecord.id).padStart(8, '0')}</Eyebrow>
+                <div style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg3, marginTop: 4 }}>
+                  ts {activeRecord.ts}T14:32:08Z · {MOCK_REPORT.llm_model} · {MOCK_REPORT.vllm_model}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <HeadlineSection data={MOCK_REPORT} populated={true}/>
+                <VisualEvidenceSection data={MOCK_REPORT} populated={true}/>
+                <InterpretationSection data={MOCK_REPORT} populated={true}/>
+                <PriorContextSection data={MOCK_REPORT} populated={true}/>
+                <PipelineTraceSection data={MOCK_REPORT} populated={true}/>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ================== ARCHITECTURE PAGE ==================
+
+const NODES = [
+  { id: 'validate', label: 'validate', x: 470, y: 30, type: 'linear', icon: 'check',
+    fn: 'Validates inputs (image, coords, class list) and computes deterministic hashes (image_hash, class_list_hash). Generates analysis_id UUID.',
+    inputs: ['image_bytes', 'lat, lon', 'class_list'],
+    outputs: ['class_list_hash', 'image_hash', 'analysis_id'],
+    failure: 'Fatal — request returns HTTP 400.' },
+  { id: 'preprocess', label: 'preprocess', x: 470, y: 110, type: 'linear', icon: 'layers',
+    fn: 'EXIF orientation correction, RGB conversion, dimension validation, and tiling decision (≤1024px passthrough; >1024px tiles at 512×512 with 10% overlap).',
+    inputs: ['image_bytes'],
+    outputs: ['processed_patches', 'was_tiled', 'num_patches'],
+    failure: 'Fatal if image below 224px minimum dimension.' },
+  { id: 'decide_cluster', label: 'decide_cluster', x: 470, y: 190, type: 'decision', icon: 'branch',
+    fn: 'Selects clustering strategy based on class list length: none (2–9), hierarchical_d1 (10–25), or hierarchical_d2 (26+).',
+    inputs: ['class_list'],
+    outputs: ['clustering_strategy'],
+    branches: ['classes < 10 → describe_patches', 'classes ≥ 10 → cluster'],
+    failure: 'No failure — pure routing.' },
+  { id: 'cluster', label: 'cluster', x: 250, y: 270, type: 'conditional', icon: 'git',
+    fn: 'Generates meta-class hierarchy via LLM. Caches result by class_list_hash to avoid recomputing for same taxonomy.',
+    inputs: ['class_list', 'class_list_hash'],
+    outputs: ['class_hierarchy', 'effective_class_list', 'used_clustering = true'],
+    failure: 'Falls back to flat classification with original class list.' },
+  { id: 'describe_patches', label: 'describe_patches', x: 470, y: 350, type: 'parallel', icon: 'cpu',
+    fn: 'Fans out parallel vLLM calls (one per patch via LangGraph Send) to generate per-patch descriptions. Concurrency capped at 4.',
+    inputs: ['processed_patches'],
+    outputs: ['patch_descriptions[]'],
+    failure: 'Per-patch failures append empty strings; pipeline continues.' },
+  { id: 'synthesize', label: 'synthesize', x: 470, y: 430, type: 'linear', icon: 'cpu',
+    fn: 'LLM call to combine per-patch descriptions into a single coherent description. Skipped for single-patch images.',
+    inputs: ['patch_descriptions', 'was_tiled'],
+    outputs: ['synthesized_description'],
+    failure: 'Falls back to spatially-labeled concatenation.' },
+  { id: 'retrieve', label: 'retrieve', x: 470, y: 510, type: 'linear', icon: 'database',
+    fn: 'Hybrid Qdrant query: geo_radius + class_list_hash + optional time + confidence floor, ranked by cosine similarity to current description embedding. Top-3 returned.',
+    inputs: ['lat, lon', 'class_list_hash', 'synthesized_description', 'retrieval_radius_km'],
+    outputs: ['retrieved_context', 'retrieval_relaxation_applied'],
+    failure: 'Returns empty context; pipeline proceeds.' },
+  { id: 'classify', label: 'classify', x: 470, y: 590, type: 'decision', icon: 'target',
+    fn: 'Structured-output LLM call (Gemini Flash JSON mode). Returns predicted_class, confidence (1–5), reasoning, alternatives, and ambiguity reason in one call.',
+    inputs: ['synthesized_description', 'effective_class_list', 'retrieved_context'],
+    outputs: ['predicted_class', 'confidence', 'reasoning', 'alternative_classes', 'ambiguity_reason'],
+    branches: ['conf ≥ 4 → store', 'conf 2–3 → retry_vllm', 'conf ≤ 1 → clip_fallback'],
+    failure: 'Sets confidence=0; conditional edge routes to CLIP.' },
+  { id: 'retry_vllm', label: 'retry_vllm_targeted', x: 200, y: 670, type: 'conditional', icon: 'refresh',
+    fn: 'Re-runs vLLM with a targeted disambiguation prompt focused on distinguishing top candidate classes. Re-enters classify with used_retry=true.',
+    inputs: ['predicted_class', 'alternative_classes', 'ambiguity_reason'],
+    outputs: ['updated patch_descriptions', 'updated synthesized_description', 'used_retry = true'],
+    failure: 'Falls through to CLIP fallback.' },
+  { id: 'clip_fallback', label: 'clip_fallback', x: 740, y: 670, type: 'conditional', icon: 'flame',
+    fn: 'CLIP image-to-text similarity classification as last resort when LLM has failed or returned critically low confidence.',
+    inputs: ['image_bytes', 'effective_class_list'],
+    outputs: ['predicted_class', 'confidence = 2', 'used_clip_fallback = true'],
+    failure: 'Returns argmax with confidence 0; logged.' },
+  { id: 'store', label: 'store', x: 470, y: 750, type: 'linear', icon: 'database',
+    fn: 'Persists analysis to Qdrant if confidence ≥ 3 and image bytes to object storage. Storage failures are non-fatal.',
+    inputs: ['all accumulated state'],
+    outputs: ['Qdrant point written', 'image_ref in object storage'],
+    failure: 'Logs error but always succeeds at the response level.' },
+  { id: 'format', label: 'format', x: 470, y: 830, type: 'linear', icon: 'check',
+    fn: 'Builds the AnalyzeResponse object from accumulated state, distinguishing user-facing fields from internal debug data.',
+    inputs: ['all accumulated state'],
+    outputs: ['final_result (AnalyzeResponse)'],
+    failure: 'No external calls; pure assembly logic.' },
+];
+
+const EDGES = [
+  { from: 'validate', to: 'preprocess', type: 'linear' },
+  { from: 'preprocess', to: 'decide_cluster', type: 'linear' },
+  { from: 'decide_cluster', to: 'cluster', type: 'conditional', label: 'classes ≥ 10' },
+  { from: 'decide_cluster', to: 'describe_patches', type: 'conditional', label: 'classes < 10' },
+  { from: 'cluster', to: 'describe_patches', type: 'linear' },
+  { from: 'describe_patches', to: 'synthesize', type: 'parallel' },
+  { from: 'synthesize', to: 'retrieve', type: 'linear' },
+  { from: 'retrieve', to: 'classify', type: 'linear' },
+  { from: 'classify', to: 'retry_vllm', type: 'conditional', label: 'conf 2–3' },
+  { from: 'classify', to: 'clip_fallback', type: 'conditional', label: 'conf ≤ 1' },
+  { from: 'classify', to: 'store', type: 'conditional', label: 'conf ≥ 4' },
+  { from: 'retry_vllm', to: 'classify', type: 'retry', label: 'one retry' },
+  { from: 'clip_fallback', to: 'store', type: 'linear' },
+  { from: 'store', to: 'format', type: 'linear' },
+];
+
+const ArchitecturePage = () => {
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+  const containerRef = useRef(null);
+
+  const nodeColor = (type) => {
+    if (type === 'decision') return { bg: 'rgba(14,165,233,0.10)', border: DS.primaryBorder, accent: DS.primary };
+    if (type === 'conditional') return { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.3)', accent: '#fcd34d' };
+    if (type === 'parallel') return { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.3)', accent: DS.success };
+    return { bg: DS.card, border: DS.border, accent: DS.fg2 };
+  };
+
+  const nodeMap = useMemo(() => Object.fromEntries(NODES.map(n => [n.id, n])), []);
+
+  const renderEdge = (e, idx) => {
+    const from = nodeMap[e.from];
+    const to = nodeMap[e.to];
+    if (!from || !to) return null;
+
+    const fromX = from.x + 75;
+    const fromY = from.y + 30;
+    const toX = to.x + 75;
+    const toY = to.y;
+
+    const dasharray = e.type === 'conditional' ? '4 4' : e.type === 'retry' ? '2 6' : 'none';
+    const stroke = e.type === 'conditional' ? '#fcd34d' :
+                   e.type === 'retry' ? DS.error :
+                   e.type === 'parallel' ? DS.success : DS.fg3;
+    const strokeOpacity = e.type === 'linear' ? 0.4 : 0.7;
+
+    let path;
+    if (e.type === 'retry') {
+      // Curved loop from retry_vllm back up to classify
+      path = `M ${fromX} ${from.y} Q ${fromX - 80} ${from.y - 40}, ${toX - 80} ${to.y + 30} Q ${toX - 40} ${to.y + 60}, ${toX} ${to.y + 30}`;
+    } else if (Math.abs(fromX - toX) > 10) {
+      // Diagonal/branching
+      const midY = (fromY + toY) / 2;
+      path = `M ${fromX} ${fromY} Q ${fromX} ${midY}, ${(fromX + toX) / 2} ${midY} T ${toX} ${toY}`;
+    } else {
+      path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
+    }
+
+    const labelX = (fromX + toX) / 2;
+    const labelY = (fromY + toY) / 2;
+
+    return (
+      <g key={idx}>
+        <path d={path} fill="none" stroke={stroke} strokeWidth="1.5" strokeDasharray={dasharray} opacity={strokeOpacity} markerEnd={e.type === 'retry' ? 'url(#arrow-retry)' : 'url(#arrow)'}/>
+        {e.label && (
+          <g>
+            <rect x={labelX - 36} y={labelY - 8} width="72" height="16" rx="3" fill={DS.bg} stroke={stroke} strokeOpacity="0.4" strokeWidth="0.5"/>
+            <text x={labelX} y={labelY + 3} textAnchor="middle" fontFamily={DS.mono} fontSize="9" fill={stroke} letterSpacing="0.04em">
+              {e.label}
+            </text>
+          </g>
+        )}
+      </g>
+    );
+  };
+
+  return (
+    <div ref={containerRef} style={{
+      height: 'calc(100vh - 64px)',
+      background: 'radial-gradient(circle at 50% 0%, rgba(14,165,233,0.04), transparent 50%), ' + DS.bg,
+      position: 'relative',
+      overflow: 'auto',
+    }}
+    onMouseLeave={() => setHoveredNode(null)}>
+
+      {/* Header overlay */}
+      <div style={{ padding: '24px 36px 16px', position: 'sticky', top: 0, background: DS.bg, zIndex: 20, borderBottom: `1px solid ${DS.border}` }}>
+        <Eyebrow>§ ARCHITECTURE · LANGGRAPH AGENT</Eyebrow>
+        <h2 style={{ fontFamily: DS.display, fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', color: DS.fg, marginTop: 8 }}>
+          Agent Graph
+        </h2>
+        <div style={{ fontSize: 13, color: DS.fg2, fontWeight: 300, marginTop: 4, maxWidth: 720, lineHeight: 1.55 }}>
+          Compiled once at FastAPI startup. Hover a node to see its IO contract.
+          Conditional edges are dashed; retry edges loop back.
+        </div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 12, fontFamily: DS.mono, fontSize: 11, color: DS.fg3 }}>
+          <span>{NODES.length} nodes</span>
+          <span>·</span>
+          <span>{EDGES.length} edges</span>
+          <span>·</span>
+          <span>3 conditional branches</span>
+          <span>·</span>
+          <span>1 retry loop</span>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{
+        position: 'sticky', top: 130, marginLeft: 'auto', float: 'right',
+        marginTop: 16, marginRight: 32,
+        background: 'rgba(13,21,32,0.92)',
+        border: `1px solid ${DS.border}`,
+        borderRadius: 8, padding: 14,
+        backdropFilter: 'blur(8px)',
+        zIndex: 15,
+        width: 220,
+      }}>
+        <Eyebrow>LEGEND</Eyebrow>
+        <div style={{ marginTop: 10, fontSize: 11, fontFamily: DS.mono, color: DS.fg2, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="32" height="2"><line x1="0" y1="1" x2="32" y2="1" stroke={DS.fg3} strokeWidth="1.5"/></svg>
+            <span>linear edge</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="32" height="2"><line x1="0" y1="1" x2="32" y2="1" stroke="#fcd34d" strokeWidth="1.5" strokeDasharray="4 4"/></svg>
+            <span>conditional edge</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="32" height="2"><line x1="0" y1="1" x2="32" y2="1" stroke={DS.error} strokeWidth="1.5" strokeDasharray="2 6"/></svg>
+            <span>retry / loop</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="32" height="2"><line x1="0" y1="1" x2="32" y2="1" stroke={DS.success} strokeWidth="1.5"/></svg>
+            <span>parallel fan-out</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Graph canvas */}
+      <div style={{ position: 'relative', width: 1100, height: 940, margin: '20px auto 80px' }}>
+        <svg width="1100" height="940" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <defs>
+            <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+              <polygon points="0 0, 8 4, 0 8" fill={DS.fg3}/>
+            </marker>
+            <marker id="arrow-retry" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+              <polygon points="0 0, 8 4, 0 8" fill={DS.error}/>
+            </marker>
+          </defs>
+          {EDGES.map((e, i) => renderEdge(e, i))}
+        </svg>
+
+        {NODES.map(n => {
+          const colors = nodeColor(n.type);
+          const isHovered = hoveredNode === n.id;
+          return (
+            <div
+              key={n.id}
+              onMouseEnter={(e) => {
+                setHoveredNode(n.id);
+                const rect = containerRef.current.getBoundingClientRect();
+                setHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+              }}
+              onMouseLeave={() => setHoveredNode(null)}
+              style={{
+                position: 'absolute',
+                left: n.x,
+                top: n.y,
+                width: 150,
+                height: 60,
+                background: colors.bg,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+                padding: '12px 14px',
+                cursor: 'pointer',
+                transition: 'all 200ms ease',
+                transform: isHovered ? 'scale(1.04)' : 'scale(1)',
+                boxShadow: isHovered ? `0 0 24px ${colors.accent}55` : 'none',
+                display: 'flex', alignItems: 'center', gap: 10,
+                zIndex: isHovered ? 5 : 2,
+              }}
+            >
+              <Icon name={n.icon} size={14} color={colors.accent}/>
+              <span style={{
+                fontFamily: DS.mono, fontSize: 12, fontWeight: 500, color: DS.fg,
+                letterSpacing: '0.02em',
+              }}>{n.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Hover card */}
+      {hoveredNode && (() => {
+        const n = nodeMap[hoveredNode];
+        if (!n) return null;
+
+        // Position card to right of node, but flip if too close to right edge
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        const cardWidth = 320;
+        const nodeAbsX = (1100 - 1100) / 2 + n.x + (containerRect ? (containerRect.width - 1100) / 2 : 0);
+        const flipLeft = nodeAbsX + 150 + cardWidth + 20 > (containerRect?.width || 1100);
+
+        return (
+          <div style={{
+            position: 'fixed',
+            left: flipLeft ? Math.max(20, hoverPos.x - cardWidth - 20) : hoverPos.x + 20,
+            top: Math.min((containerRect?.height || 800) - 380, hoverPos.y + 60),
+            width: cardWidth,
+            background: 'rgba(13,21,32,0.96)',
+            border: `1px solid ${DS.borderMid}`,
+            borderRadius: 8,
+            padding: 16,
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.7)',
+            zIndex: 1000,
+            pointerEvents: 'none',
+          }}>
+            <div style={{
+              fontFamily: DS.mono, fontSize: 13, fontWeight: 600,
+              color: nodeColor(n.type).accent,
+              marginBottom: 8, letterSpacing: '0.02em',
+            }}>{n.label.toUpperCase()}</div>
+            <div style={{ fontFamily: DS.body, fontSize: 12.5, color: DS.fg2, lineHeight: 1.55, marginBottom: 14, fontWeight: 300 }}>
+              {n.fn}
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontFamily: DS.mono, fontSize: 9.5, color: DS.fg3, letterSpacing: '0.10em', marginBottom: 4 }}>INPUTS</div>
+              {n.inputs.map(i => (
+                <div key={i} style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg, marginBottom: 2 }}>· {i}</div>
+              ))}
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontFamily: DS.mono, fontSize: 9.5, color: DS.fg3, letterSpacing: '0.10em', marginBottom: 4 }}>OUTPUTS</div>
+              {n.outputs.map(o => (
+                <div key={o} style={{ fontFamily: DS.mono, fontSize: 11, color: DS.fg, marginBottom: 2 }}>· {o}</div>
+              ))}
+            </div>
+
+            {n.branches && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontFamily: DS.mono, fontSize: 9.5, color: DS.fg3, letterSpacing: '0.10em', marginBottom: 4 }}>BRANCHES</div>
+                {n.branches.map(b => (
+                  <div key={b} style={{ fontFamily: DS.mono, fontSize: 11, color: '#fcd34d', marginBottom: 2 }}>· {b}</div>
+                ))}
+              </div>
+            )}
+
+            <div>
+              <div style={{ fontFamily: DS.mono, fontSize: 9.5, color: DS.fg3, letterSpacing: '0.10em', marginBottom: 4 }}>FAILURE</div>
+              <div style={{ fontFamily: DS.body, fontSize: 11.5, color: DS.fg2, fontWeight: 300, lineHeight: 1.5 }}>{n.failure}</div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+};
+
+// ================== APP SHELL ==================
+
+const App = () => {
+  const [page, setPage] = useState(() => {
+    const hash = window.location.hash.slice(1);
+    return ['overview', 'analysis', 'archive', 'architecture'].includes(hash) ? hash : 'overview';
+  });
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (['overview', 'analysis', 'archive', 'architecture'].includes(hash)) {
+        setPage(hash);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const navigate = (target) => {
+    window.location.hash = target;
+    setPage(target);
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: DS.bg }}>
+      <TopNav active={page} onNavigate={navigate}/>
+      {page === 'overview' && <OverviewPage onNavigate={navigate}/>}
+      {page === 'analysis' && <AnalysisPage/>}
+      {page === 'archive' && <ArchivePage/>}
+      {page === 'architecture' && <ArchitecturePage/>}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+</body>
+</html>

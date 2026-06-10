@@ -1,0 +1,117 @@
+/*
+ * GeoShield — Design Tokens ("The Orbital Lens")
+ * Single source of truth for all design values. Sourced verbatim from DESIGN.md
+ * §3 (Color), §4 (Typography), §5 (Spacing), with foundational radius/shadow/glow
+ * tokens (§6, §8) included here because this is the canonical token surface.
+ *
+ * Never use a raw hex value in a component — always reference a token.
+ */
+
+:root {
+  /* ───────────────────────── §3 Color ───────────────────────── */
+
+  /* Core palette */
+  --primary: #adc6ff;
+  --primary-container: #2d3f6b;
+  --on-primary: #0b0e14;
+  --secondary: #b7c8e1;
+  --on-secondary: #10131a;
+  --tertiary: #4edea3;
+  --on-tertiary: #0b0e14;
+
+  /* Surface hierarchy (tonal shifts, not borders) */
+  --surface-container-lowest: #0b0e14;
+  --surface: #10131a;
+  --surface-container-low: #141822;
+  --surface-container: #1a1f2a;
+  --surface-container-high: #222834;
+  --surface-container-highest: #2a3140;
+  --surface-variant: #1a1f2a;
+
+  /* On-surface text */
+  --on-surface: #e6eaf2;
+  --on-surface-variant: #a8b1c4;
+  --outline: #3a4254;
+  --outline-variant: #2a3140;
+
+  /* Semantic (always pair with a text label or icon) */
+  --success: #4edea3;
+  --warning: #ffc76b;
+  --danger: #ff7b7b;
+
+  /* Semantic glow — applied to the Headline Result by confidence tier (§3) */
+  --glow-high: 0 0 24px rgba(78, 222, 163, 0.15);
+  --glow-medium: 0 0 24px rgba(255, 199, 107, 0.15);
+  --glow-low: 0 0 24px rgba(255, 123, 123, 0.15);
+
+  /* ─────────────────────── §4 Typography ────────────────────── */
+
+  /* Font stacks */
+  --font-display: "Space Grotesk", system-ui, sans-serif; /* display & headlines */
+  --font-body: "Inter", system-ui, sans-serif; /* body & data */
+  --font-mono: "Inter", system-ui, sans-serif; /* technical readouts (use tabular-nums) */
+
+  /* Type scale: size / line-height / weight */
+  --display-lg-size: 3.75rem;   --display-lg-leading: 1.1;   --display-lg-weight: 700;
+  --display-md-size: 3rem;      --display-md-leading: 1.15;  --display-md-weight: 700;
+  --display-sm-size: 2.25rem;   --display-sm-leading: 1.2;   --display-sm-weight: 600;
+  --headline-lg-size: 1.875rem; --headline-lg-leading: 1.25; --headline-lg-weight: 600;
+  --headline-md-size: 1.5rem;   --headline-md-leading: 1.3;  --headline-md-weight: 600;
+  --headline-sm-size: 1.25rem;  --headline-sm-leading: 1.35; --headline-sm-weight: 600;
+  --body-lg-size: 1.125rem;     --body-lg-leading: 1.5;      --body-lg-weight: 400;
+  --body-md-size: 1rem;         --body-md-leading: 1.5;      --body-md-weight: 400;
+  --body-sm-size: 0.875rem;     --body-sm-leading: 1.5;      --body-sm-weight: 400;
+  --label-lg-size: 0.875rem;    --label-lg-leading: 1.3;     --label-lg-weight: 500;
+  --label-md-size: 0.75rem;     --label-md-leading: 1.3;     --label-md-weight: 500;
+  --label-sm-size: 0.6875rem;   --label-sm-leading: 1.3;     --label-sm-weight: 500;
+  --mono-md-size: 1rem;         --mono-md-leading: 1.4;      --mono-md-weight: 400;
+  --mono-sm-size: 0.875rem;     --mono-sm-leading: 1.4;      --mono-sm-weight: 400;
+
+  /* Small-caps label treatment (§4) */
+  --label-letter-spacing: 0.08em;
+
+  /* ───────────────────────── §5 Spacing ─────────────────────── */
+  --space-xs: 0.25rem;  /* icon-to-text gaps */
+  --space-sm: 0.5rem;   /* compact padding */
+  --space-md: 0.75rem;  /* default inline gaps */
+  --space-lg: 1rem;     /* standard component padding */
+  --space-xl: 1.5rem;   /* section / card padding */
+  --space-2xl: 2.5rem;  /* section gaps within a page */
+  --space-3xl: 4rem;    /* major layout gaps */
+
+  /* ─────────────── Foundational radius / elevation (§6, §8) ─────────────── */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+
+  /* Ambient shadows — never pure black; tinted on-surface (§6) */
+  --shadow-card: 0 16px 48px rgba(230, 234, 242, 0.06);
+  --shadow-modal: 0 32px 96px rgba(230, 234, 242, 0.08);
+
+  /* Glass treatment (§8): surface_variant @ ~60% + 32px blur */
+  --glass-bg: rgba(26, 31, 42, 0.6);
+  --glass-blur: 32px;
+
+  /* Motion (§7) */
+  --motion-default: 200ms;
+  --motion-micro: 150ms;
+  --motion-layout: 250ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-layout: cubic-bezier(0.2, 0, 0, 1);
+  --shimmer-duration: 1500ms;
+}
+
+/* Base document defaults (no pure black; body font + primary text color) */
+html,
+body {
+  margin: 0;
+  background-color: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
